@@ -157,13 +157,13 @@ api:
 ota:
 
 wifi:
-  ssid: "SmarTiFi"
-  password: "E1F01C3AEE"
+  ssid: "YOUR-SSID"
+  password: "YOUR-PASSWORD"
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "home-solar"
-    password: "Jixo@2020"
+    password: "home-solar"
 
 captive_portal:
 
