@@ -1,0 +1,171 @@
+esphome:
+  name: home-solar
+  platform: esp8266
+  board: esp01_1m
+
+substitutions:
+  devicename: $name
+
+cd74hc4067:
+  pin_s0: GPIO5
+  pin_s1: GPIO4
+  pin_s2: GPIO0
+  pin_s3: GPIO2
+
+sensor:
+  - platform: adc
+    id: adc_sensor
+    pin: A0
+    update_interval: 500ms
+
+  - platform: cd74hc4067
+    id: mains
+    number: 0
+    sensor: adc_sensor
+    name: "Mains"
+    update_interval: 700ms
+    filters:
+      - multiply: 25
+    internal: true
+
+  - platform: cd74hc4067
+    id: inverter
+    number: 1
+    sensor: adc_sensor
+    name: "Inverter"
+    update_interval: 900ms
+    filters:
+      - multiply: 25
+    internal: true
+
+  - platform: wifi_signal
+    name: "Inverter WiFi"
+    update_interval: 60s
+
+  - platform: template
+    name: "Inverter Status"
+    update_interval: 1s
+    lambda: |-
+      static uint32_t on_counter = 0;
+      static uint32_t off_counter = 0;
+
+      if (id(inverter_stable).state) {
+        on_counter++;
+        off_counter = 0;
+
+        if (on_counter >= 30) {
+          return 1.0;  // Representing "House on Inverter" state
+        } else {
+          return 0.5;  // Representing "Inverter on Standby" state
+        }
+      } else {
+        on_counter = 0;
+        off_counter++;
+
+        if (off_counter >= 180) {
+          return 0.0;  // Representing "Inverter Off" state
+        } else {
+          return 0.5;  // Representing "Inverter on Standby" state
+        }
+      }
+
+  - platform: template
+    name: "Mains Status"
+    update_interval: 1s
+    lambda: |-
+      static uint32_t on_counter = 0;
+      static uint32_t off_counter = 0;
+
+      if (id(mains_stable).state) {
+        on_counter++;
+        off_counter = 0;
+
+        if (on_counter >= 30) {
+          return 1.0;  // Representing "House on Grid" state
+        } else {
+          return 0.5;  // Representing "Grid on Standby" state
+        }
+      } else {
+        on_counter = 0;
+        off_counter++;
+
+        if (off_counter >= 180) {
+          return 0.0;  // Representing "Grid Failure" state
+        } else {
+          return 0.5;  // Representing "Grid on Standby" state
+        }
+      }
+
+binary_sensor:
+  - platform: template
+    name: "Mains Stable"
+    id: mains_stable
+    lambda: |-
+      static bool last_state = false;
+      static bool condition_met = false;
+
+      if (id(mains).state >= 1.0) {
+        condition_met = true;
+      } else {
+        condition_met = false;
+        last_state = false;
+      }
+
+      if (condition_met) {
+        static uint32_t duration_counter = 0;
+        if (duration_counter >= 300) {
+          last_state = true;
+        } else {
+          duration_counter++;
+          last_state = false;
+        }
+      }
+
+      return last_state;
+    internal: true
+
+  - platform: template
+    name: "Inverter Stable"
+    id: inverter_stable
+    lambda: |-
+      static bool last_state = false;
+      static bool condition_met = false;
+      static uint32_t stable_duration = 0;
+
+      if (id(inverter).state >= 1.0) {
+        condition_met = true;
+        stable_duration++;
+        if (stable_duration >= 60) {
+          last_state = true;
+        }
+      } else {
+        condition_met = false;
+        stable_duration = 0;
+        last_state = false;
+      }
+
+      return last_state;
+    internal: true
+
+# Enable logging
+logger:
+  level: ERROR
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+wifi:
+  ssid: "SmarTiFi"
+  password: "E1F01C3AEE"
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "home-solar"
+    password: "Jixo@2020"
+
+captive_portal:
+
+web_server:
+  port: 80
